@@ -59,7 +59,7 @@ jobs:
               }
             }
             if (matches.length === 0) throw new Error('Aucun match reçu : publication annulée pour conserver les anciennes données');
-            fs.writeFileSync('site/matches.json', JSON.stringify({version: 1, source: 'API-Football', misAJour: new Date().toISOString(), jours: 7, matches}));
+            fs.writeFileSync('site/matches.json', JSON.stringify({version: 1, source: 'API-Football', misAJour: new Date().toISOString(), jours: 2, matches}));
             fs.writeFileSync('site/index.html', '<!doctype html><html lang="fr"><meta charset="utf-8"><title>EZI BET LIGDI</title><p>Flux des matchs EZI BET LIGDI disponible.</p></html>');
             console.log(`${matches.length} matchs enregistrés`);
           })().catch(e => { console.error(e.message); process.exit(1); });
