@@ -36,7 +36,7 @@ jobs:
             const matches = [];
             const today = new Date();
             today.setUTCHours(0, 0, 0, 0);
-            for (let day = 0; day < 7; day++) {
+            for (let day = 0; day < 2; day++) {
               const date = new Date(today.getTime() + day * 86400000).toISOString().slice(0, 10);
               const url = new URL('https://v3.football.api-sports.io/fixtures');
               url.searchParams.set('date', date);
