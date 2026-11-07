@@ -1,0 +1,75 @@
+name: Actualiser les matchs EZI
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 6 * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-ezi
+  cancel-in-progress: false
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - name: Télécharger les matchs API-Football
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p site
+          node <<'NODE'
+          const fs = require('fs');
+          const key = process.env.API_FOOTBALL_KEY;
+          if (!key) throw new Error('Secret API_FOOTBALL_KEY absent');
+          (async () => {
+            const matches = [];
+            const today = new Date();
+            today.setUTCHours(0, 0, 0, 0);
+            for (let day = 0; day < 7; day++) {
+              const date = new Date(today.getTime() + day * 86400000).toISOString().slice(0, 10);
+              const url = new URL('https://v3.football.api-sports.io/fixtures');
+              url.searchParams.set('date', date);
+              url.searchParams.set('timezone', 'Africa/Ouagadougou');
+              const r = await fetch(url, {headers: {'x-apisports-key': key}, signal: AbortSignal.timeout(30000)});
+              if (!r.ok) throw new Error(`API indisponible (${r.status})`);
+              const data = await r.json();
+              if (data.errors && Object.keys(data.errors).length) throw new Error('Erreur API : ' + JSON.stringify(data.errors));
+              if (!Array.isArray(data.response)) throw new Error('Réponse API invalide');
+              for (const m of data.response) {
+                if (!m.fixture || !m.teams || !m.league) continue;
+                if (!['NS', 'TBD'].includes(m.fixture.status?.short)) continue;
+                matches.push({
+                  id: m.fixture.id, date: m.fixture.date,
+                  statut: m.fixture.status.short,
+                  competition: m.league.name, pays: m.league.country,
+                  competitionId: m.league.id,
+                  domicile: m.teams.home?.name, exterieur: m.teams.away?.name
+                });
+              }
+            }
+            if (matches.length === 0) throw new Error('Aucun match reçu : publication annulée pour conserver les anciennes données');
+            fs.writeFileSync('site/matches.json', JSON.stringify({version: 1, source: 'API-Football', misAJour: new Date().toISOString(), jours: 7, matches}));
+            fs.writeFileSync('site/index.html', '<!doctype html><html lang="fr"><meta charset="utf-8"><title>EZI BET LIGDI</title><p>Flux des matchs EZI BET LIGDI disponible.</p></html>');
+            console.log(`${matches.length} matchs enregistrés`);
+          })().catch(e => { console.error(e.message); process.exit(1); });
+          NODE
+      - name: Préparer GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Préparer les fichiers à publier
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - name: Publier le flux
+        id: deploiement
+        uses: actions/deploy-pages@v4
